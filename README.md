@@ -1,9 +1,8 @@
 # 🎬 VoodooHut Music Video Generator
 
-An AI-powered pipeline for creating full-length animated music videos —
-from song upload to final render — with visual continuity maintained throughout.
+An AI-powered pipeline that turns a song upload into a full-length animated music video — complete with ken burns motion, lyric overlays, crossfades, and particle effects — with visual continuity maintained throughout.
 
-Built for [TheVoodooHut.tv](https://thevoodoohut.tv)
+Built for **TheVoodooHut.tv** · Runs **100% free locally** · Upgrade path to GPU/cloud via env vars only.
 
 ---
 
@@ -11,65 +10,73 @@ Built for [TheVoodooHut.tv](https://thevoodoohut.tv)
 
 ```
 Song Upload
-    ↓
-① Audio Analysis      Whisper (transcript + timestamps) + GPT-4o (meaning + structure)
-    ↓
-② Visual Treatment    GPT-4o generates a creative direction proposal
-    ↓  [Human Approval]
-③ Element Extraction  AI creates the registry: characters, locations, props, states
-    ↓
-④ Background Gen      FLUX.1 generates each location (static bg layer only)
-    ↓
-⑤ Element Gen         FLUX.1 generates each element on transparent bg, all states
-    ↓
-⑥ Storyboard Build    Elements composited onto backgrounds; each panel = clip frame
-    ↓  [Human Review]
-⑦ Clip Generation     RunwayML Gen-4 animates image pairs into 5-second clips
-    ↓
-⑧ Final Assembly      FFmpeg stitches clips + syncs audio into the finished video
+↓
+① Audio Analysis    — Whisper (local, free) → transcript + word timestamps
+                      Groq / Llama 3.3 70B  → mood, structure, narrative arc
+↓
+② Visual Treatment  — Groq generates a full creative direction proposal
+↓ [Human Approval]
+③ Element Extraction — AI creates the registry: characters, locations, props, states
+↓
+④ Background Gen    — FLUX.1-schnell (HuggingFace free tier) → 1920×1080 backgrounds
+↓
+⑤ Element Gen       — FLUX.1-schnell → elements on transparent bg (rembg removes bg)
+↓
+⑥ Storyboard Build  — Pillow composites elements onto backgrounds; panels reviewed
+↓ [Human Review]
+⑦ Remotion Assembly — React/Remotion renders the full video in one pass:
+                       • Ken Burns motion (zoom-in/out, pan-left/right)
+                       • Crossfades between panels
+                       • Whisper-synced lyric overlays
+                       • Energy-level-driven particle effects
+                       • Audio track sync
 ```
 
 ---
 
 ## Tech Stack
 
-| Layer              | Technology              | Purpose                          |
-|--------------------|-------------------------|----------------------------------|
-| Frontend           | Next.js 14 + Tailwind   | Dashboard + approval UI          |
-| Backend            | FastAPI (Python)        | Pipeline orchestration           |
-| Queue              | Celery + Redis          | Async job processing             |
-| Database           | Supabase (PostgreSQL)   | Project state + metadata         |
-| File Storage       | Cloudflare R2           | Audio, images, video assets      |
-| Transcription      | OpenAI Whisper API      | Lyric extraction + timestamps    |
-| Song Analysis      | GPT-4o                  | Meaning, mood, narrative arc     |
-| Image Generation   | FLUX.1-dev (Replicate)  | Backgrounds + character elements |
-| Background Removal | REMBG (open source)     | Element isolation to PNG         |
-| Video Generation   | RunwayML Gen-4 API      | 5-second animated clips          |
-| Video Assembly     | FFmpeg                  | Final stitch + audio sync        |
+| Layer | Technology | Purpose |
+|---|---|---|
+| Frontend | Next.js 15 + Tailwind | Dashboard + approval UI |
+| Backend | FastAPI + Celery | Pipeline orchestration |
+| Queue | Celery memory:// broker | Async jobs — no Redis needed |
+| Database | SQLite + SQLAlchemy | Project state — no DB server needed |
+| Storage | Local filesystem | Audio, images, video — no cloud needed |
+| Transcription | OpenAI Whisper (local) | Free, runs on CPU, ~140MB model |
+| LLM | Groq free tier (Llama 3.3 70B) | Analysis, treatment, extraction |
+| Image Gen | HuggingFace FLUX.1-schnell | Free tier, 2s delay between calls |
+| Background Removal | rembg + onnxruntime | Free, runs locally |
+| Video Composition | Remotion (React) | Free, renders via Node.js |
 
-### Cost Per Video (3-minute song, ~36 clips)
+**Cost per video: $0.00** (free tiers only)
 
-| Step                        | Approx Cost |
-|-----------------------------|-------------|
-| Whisper transcription       | $0.10       |
-| GPT-4o analysis + treatment | $0.15       |
-| FLUX.1 images (~25 images)  | $0.08       |
-| RunwayML 5-sec clips (x36)  | $1.80       |
-| **Total**                   | **~$2.15**  |
+---
+
+## Upgrade Path
+
+Everything upgrades via `.env` only — zero code changes:
+
+| Now (free) | Later (upgrade) |
+|---|---|
+| Groq / Llama 3.3 | Ollama (local GPU) or GPT-4o |
+| HuggingFace FLUX.1-schnell | Local FLUX (GPU) or Replicate |
+| Local storage | Cloudflare R2 |
+| SQLite | Supabase / PostgreSQL |
+| Remotion | Wan2.1 local GPU (`VIDEO_BACKEND=wan2`) |
 
 ---
 
 ## Quick Start
 
-### 1. Configure
+### 1. Get free API keys
+- **Groq**: https://console.groq.com → free, no credit card
+- **HuggingFace**: https://huggingface.co → Settings → Access Tokens
+
+### 2. Configure
 ```bash
 cp .env.example .env
-# Fill in your API keys
-```
-
-### 2. Start Redis
-```bash
-docker-compose up -d
+# Add GROQ_API_KEY and HF_TOKEN
 ```
 
 ### 3. Backend
@@ -77,11 +84,19 @@ docker-compose up -d
 cd backend
 pip install -r requirements.txt
 uvicorn main:app --reload
-# In a second terminal:
-celery -A workers.pipeline_worker worker --loglevel=info
+# In a second terminal (Windows needs --pool=solo):
+celery -A workers.pipeline_worker worker --pool=solo --loglevel=info
 ```
 
-### 4. Frontend
+### 4. Remotion (video composer)
+```bash
+cd remotion-composer
+npm install
+# Optional: preview in browser
+npx remotion studio
+```
+
+### 5. Frontend
 ```bash
 cd frontend
 npm install
@@ -94,11 +109,9 @@ Open http://localhost:3000
 
 ## Continuity Bible
 
-Every project generates a `BIBLE.md` that tracks all named elements, approved
-appearances, asset paths, storyboard order, and color palette. This ensures
-visual consistency even if work is paused and resumed across sessions.
+Every project generates a `BIBLE.md` tracking all named elements, approved appearances, asset paths, storyboard order, and color palette — ensuring visual consistency across sessions.
 
-See `bible_template/BIBLE.md` for the full structure.
+See [`bible_template/BIBLE.md`](bible_template/BIBLE.md) for the full structure.
 
 ---
 
