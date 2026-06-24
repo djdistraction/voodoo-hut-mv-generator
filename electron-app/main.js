@@ -6,7 +6,16 @@ const fs = require('fs');
 const os = require('os');
 
 // Handle Squirrel events (Windows installer)
-if (require('electron-squirrel-startup')) app.quit();
+// electron-builder handles Squirrel setup automatically
+if (process.platform === 'win32') {
+  const squirrelEvent = process.argv[1];
+  if (squirrelEvent === '--squirrel-install' ||
+      squirrelEvent === '--squirrel-updated' ||
+      squirrelEvent === '--squirrel-uninstall') {
+    app.quit();
+    return;
+  }
+}
 
 let mainWindow;
 let tray;
