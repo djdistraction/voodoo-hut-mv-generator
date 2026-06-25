@@ -94,7 +94,7 @@ function startBackend(config) {
       }
 
       // Spawn uvicorn process
-      backendProcess = spawn('python', ['-m', 'uvicorn', 'main:app', '--port', config.backendPort, '--host', '127.0.0.1'], {
+      backendProcess = spawn('py', ['-m', 'uvicorn', 'main:app', '--port', config.backendPort, '--host', '127.0.0.1'], {
         cwd: backendPath,
         env,
         stdio: ['ignore', 'pipe', 'pipe'],
