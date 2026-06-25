@@ -195,6 +195,9 @@ layout.tsx (metadata, Tailwind setup)
     ├── treatment/
     │   ├── page.tsx (route wrapper)
     │   └── TreatmentDetail.tsx (review & approve treatment)
+    ├── manifest/
+    │   ├── page.tsx (route wrapper)
+    │   └── ManifestDetail.tsx (shot manifest table, approval/rejection)
     ├── elements/
     │   ├── page.tsx (route wrapper)
     │   └── ElementsList.tsx (asset gallery with regenerate)
@@ -210,8 +213,8 @@ layout.tsx (metadata, Tailwind setup)
 - Axios-based with 2-minute timeout for uploads
 - Auto-logs network errors with backend URL hint
 - Methods grouped by resource:
-  - `api.projects.{list, get, uploadAudio}`
-  - `api.pipeline.{approveTreatment, reviseTreatment, approveStoryboard, regenerateImage}`
+  - `api.projects.{list, get, uploadAudio, addReferences}`
+  - `api.pipeline.{approveTreatment, reviseTreatment, getShotManifests, approveManifests, reviseManifests, importProductionGuide, approveStoryboard, regenerateImage}`
   - `api.assets.list`
   - `api.series.{list, get, create}`
 
@@ -249,7 +252,56 @@ layout.tsx (metadata, Tailwind setup)
 
 **series** (for recurring characters/style)
 - id, name, artist
-- style_prompt, characters (JSON), color_palette (JSON)
+- style_prompt, characters (JSON), color_palette (JSON), continuity_bible (JSON)
+
+**shot_manifests** (production guide structure)
+- id (UUID)
+- project_id (FK)
+- shot_number, start_time, end_time, audio_cue
+- location, characters (JSON), camera, action, mood
+- continuity_rules (JSON), negative_constraints (JSON)
+- status (draft | reviewing | approved | locked | rejected)
+- locked_prompts (JSON, frozen after approval), asset_refs (JSON)
+
+---
+
+## Shot Manifest System
+
+The shot manifest layer provides production-grade structure for video generation:
+
+### Using Production Guides
+
+Import a production guide Excel file (e.g., shot sheet with timecodes, characters, continuity rules):
+
+```bash
+# From the frontend: upload file via UI
+POST /api/pipeline/{project_id}/import-production-guide
+
+# The API parses the file and creates shot manifests
+# Project transitions to awaiting_manifest_approval for human review
+```
+
+### Seeding Demo Projects
+
+Import the WOW OH! production guide as a canonical demo:
+
+```bash
+cd backend
+python seed_wow_oh.py /path/to/WOW_OH_Production_Shot_Sheet.xlsx
+```
+
+This creates:
+- A "WOW OH!" series with locked character definitions and continuity bible
+- A demo project with 30 shot manifests ready for approval
+- You can visit the project and review the production plan before generation
+
+### Workflow
+
+1. **Import**: Upload production guide (Excel) → creates shot manifests (draft status)
+2. **Review**: Human reviews shot manifests for accuracy and continuity
+3. **Approve**: Manifest approval locks the production plan → proceeds to storyboard
+4. **Reject**: Request changes → regenerates treatment from ground up with feedback
+5. **Generate**: Locked manifests drive image generation with locked prompts and constraints
 
 ---
 
