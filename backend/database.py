@@ -286,7 +286,7 @@ def db_get_series(series_id: str) -> dict | None:
     if not row:
         return None
     d = dict(row)
-    for field in ("characters", "color_palette"):
+    for field in ("characters", "color_palette", "continuity_bible"):
         if d.get(field):
             d[field] = json.loads(d[field])
     return d
@@ -299,7 +299,7 @@ def db_list_series() -> list[dict]:
     result = []
     for row in rows:
         d = dict(row)
-        for field in ("characters", "color_palette"):
+        for field in ("characters", "color_palette", "continuity_bible"):
             if d.get(field):
                 d[field] = json.loads(d[field])
         result.append(d)

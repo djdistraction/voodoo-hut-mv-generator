@@ -1,171 +1,106 @@
 #!/usr/bin/env python3
 """
-Seed the WOW OH! series from the production guide.
+Seed the WOW OH! demo: series + continuity bible + 30 shot manifests.
 
-This script imports the WOW_OH_Production_Shot_Sheet.xlsx into the database
-as a canonical demo series with full shot manifest data and continuity rules.
+By default this uses the embedded canonical WOW OH! data — no external file
+needed:
 
-Usage:
   cd backend
+  python seed_wow_oh.py
+
+Optionally import an Excel production shot sheet instead:
+
   python seed_wow_oh.py /path/to/WOW_OH_Production_Shot_Sheet.xlsx
 
-This creates a "WOW OH!" series you can reference in new projects.
+Creates a "WOW OH!" series and a demo project parked at
+awaiting_manifest_approval, ready to review → approve → generate → render.
 """
 import sys
 import uuid
+import asyncio
 from pathlib import Path
 
-def seed_series():
-    """Create the WOW OH! series with full continuity bible and locked characters."""
+
+def seed_series() -> str:
+    """Create the WOW OH! series with locked continuity bible + characters."""
     from database import db_create_series, db_update_series
-    from config import settings
+    from services.wow_oh_data import CONTINUITY_BIBLE, CHARACTERS, STYLE_PROMPT
 
     series_id = str(uuid.uuid4())
-
-    # Create series record
-    series = db_create_series(
-        series_id,
-        name="WOW OH!",
-        artist="HTXpunk",
-    )
-
-    # Continuity bible from the production document
-    continuity_bible = {
-        "core_concept": "Single continuous magical venue transformation",
-        "visual_world": "A single nightclub venue that transforms from corporate nightmare (office) to liberating dance experience",
-        "color_palette": ["poisonous green", "purple", "amber", "black", "hot pink"],
-        "motion_style": "Dynamic cuts with Ken Burns parallax, glitch transitions for stress scenes",
-        "transformation_logic": "As Mr. V's confidence grows, the venue shifts from corporate gray to vibrant neon",
-        "office_nightmare_rules": [
-            "Sharp geometric layouts for office/stress scenes",
-            "Cold lighting in blues and grays",
-            "Ominous background music/sound design",
-            "Stress Monster as visible antagonist",
-        ],
-        "final_image": "Only Mr. V's glowing green eyes remain as the final frame",
-        "banned_mistakes": [
-            "No context switching (office props in club, or vice versa)",
-            "Mr. V should never appear less confident as the song progresses",
-            "No outdoor scenery (it's all one venue)",
-            "No logos or text visible",
-        ],
-    }
-
-    # Locked character definitions
-    characters = {
-        "Mr_V": {
-            "role": "Protagonist",
-            "description": "The main character discovering his power through dance",
-            "visual_style": "Sharp, stylized, grows more confident",
-            "states": ["stressed", "gaining_confidence", "fully_confident", "glowing_triumphant"],
-        },
-        "The_Dolls": {
-            "role": "Background dancers",
-            "description": "Stylized female dancers who evolve with the venue transformation",
-        },
-        "The_Boss_Stress_Monster": {
-            "role": "Antagonist (stress)",
-            "description": "Visible embodiment of workplace stress and anxiety",
-        },
-        "The_Band": {
-            "role": "Musicians",
-            "description": "Live band in the venue, energizing the space",
-        },
-        "The_Viewer": {
-            "role": "POV observer",
-            "description": "Camera often acts as the viewer experiencing the transformation",
-        },
-    }
-
-    # Update series with continuity bible
+    db_create_series(series_id, name="WOW OH!", artist="HTXpunk")
     db_update_series(
         series_id,
-        continuity_bible=continuity_bible,
-        characters=characters,
-        color_palette=continuity_bible["color_palette"],
-        style_prompt="Psychedelic electronic music video with glitch aesthetic, neon colors, transformation narrative",
+        continuity_bible=CONTINUITY_BIBLE,
+        characters=CHARACTERS,
+        color_palette=CONTINUITY_BIBLE["color_palette"],
+        style_prompt=STYLE_PROMPT,
     )
-
     print(f"✓ Created WOW OH! series: {series_id}")
-    print(f"  - Continuity bible locked with character definitions")
-    print(f"  - Color palette: {', '.join(continuity_bible['color_palette'])}")
-    print(f"  - Characters: {', '.join(characters.keys())}")
+    print(f"  palette: {', '.join(CONTINUITY_BIBLE['color_palette'])}")
+    print(f"  characters: {', '.join(CHARACTERS.keys())}")
     return series_id
 
 
-def import_shots(xlsx_path: str, series_id: str):
-    """Import shot manifests from the Excel file."""
-    from services.production_guide_importer import import_wow_oh_series
-    from database import db_create_project, db_update_project, db_list_shot_manifests
-
-    print(f"\n📋 Importing shots from: {xlsx_path}")
-
-    parsed = import_wow_oh_series(series_id, xlsx_path)
-
-    print(f"✓ Imported {len(parsed['shots'])} shots:")
-    for shot in parsed['shots'][:5]:
-        print(f"  - Shot {shot['shot_number']}: {shot['audio_cue'][:40]}")
-    if len(parsed['shots']) > 5:
-        print(f"  ... and {len(parsed['shots'] - 5} more")
-
-    # Optional: create a demo project with these shots
-    demo_project_id = str(uuid.uuid4())
-    db_create_project(demo_project_id, "WOW OH! Preview", "HTXpunk")
-    db_update_project(demo_project_id, series_id=series_id)
-
-    # Create shot manifests for the demo project
+def seed_project(series_id: str, shots: list) -> str:
+    """Create a demo project with shot manifests, parked for approval."""
+    from database import db_create_project, db_update_project
     from services.production_guide_importer import create_project_shot_manifests
-    manifest_ids = create_project_shot_manifests(demo_project_id, parsed['shots'])
 
+    project_id = str(uuid.uuid4())
+    db_create_project(project_id, "WOW OH! Demo", "HTXpunk")
+    db_update_project(project_id, series_id=series_id)
+    manifest_ids = create_project_shot_manifests(project_id, shots)
     db_update_project(
-        demo_project_id,
+        project_id,
         stage="awaiting_manifest_approval",
-        revision_notes="Seeded from WOW OH! production guide",
+        revision_notes=f"Seeded {len(manifest_ids)} WOW OH! shot manifests",
     )
+    print(f"✓ Created demo project: {project_id}")
+    print(f"  stage: awaiting_manifest_approval")
+    print(f"  shots: {len(manifest_ids)} manifests")
+    return project_id
 
-    print(f"\n✓ Created demo project {demo_project_id}")
-    print(f"  - Status: awaiting_manifest_approval (ready for review)")
-    print(f"  - Shots: {len(manifest_ids)} manifests created")
 
-    print(f"\n📝 Production Guide Metadata:")
-    for key, value in parsed['metadata'].items():
-        print(f"  - {key}: {value}")
-
-    return demo_project_id
+def load_shots(xlsx_path: str | None) -> list:
+    if xlsx_path:
+        from services.production_guide_importer import parse_excel_shot_sheet
+        print(f"\U0001F4CB Importing shots from: {xlsx_path}")
+        parsed = parse_excel_shot_sheet(xlsx_path)
+        return parsed["shots"]
+    from services.wow_oh_data import SHOTS
+    print(f"\U0001F4CB Using embedded WOW OH! data ({len(SHOTS)} shots)")
+    return SHOTS
 
 
 def main():
-    if len(sys.argv) != 2:
-        print(__doc__)
-        sys.exit(1)
-
-    xlsx_path = sys.argv[1]
-    if not Path(xlsx_path).exists():
-        print(f"❌ File not found: {xlsx_path}")
-        sys.exit(1)
+    xlsx_path = None
+    if len(sys.argv) == 2:
+        xlsx_path = sys.argv[1]
+        if not Path(xlsx_path).exists():
+            print(f"❌ File not found: {xlsx_path}")
+            sys.exit(1)
 
     print("=" * 60)
-    print("WOW OH! Production Guide Seeder")
+    print("WOW OH! Demo Seeder")
     print("=" * 60)
 
     try:
-        # Ensure DB is initialized
-        import asyncio
         from database import init_db
         asyncio.run(init_db())
 
+        shots = load_shots(xlsx_path)
         series_id = seed_series()
-        project_id = import_shots(xlsx_path, series_id)
+        project_id = seed_project(series_id, shots)
 
         print("\n" + "=" * 60)
         print("✅ Seeding complete!")
         print("\nNext steps:")
-        print(f"  1. Start the frontend: cd ../frontend && npm run dev")
-        print(f"  2. Go to http://localhost:3000")
-        print(f"  3. Find project '{project_id}'")
-        print(f"  4. Review and approve the production plan")
+        print("  1. Start backend:  uvicorn main:app --reload --port 8000")
+        print("  2. Start frontend: cd ../frontend && npm run dev")
+        print(f"  3. Open the project, review the production plan, click Approve.")
+        print("     With no HF_TOKEN set, frames render as offline placeholders")
+        print("     (IMAGE_BACKEND=placeholder) so you get a full video at $0.")
         print("=" * 60)
-
     except Exception as e:
         print(f"\n❌ Error: {e}")
         import traceback

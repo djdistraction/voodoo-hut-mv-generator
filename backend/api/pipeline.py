@@ -153,10 +153,10 @@ async def approve_manifests(project_id: str, body: ManifestApproval = ManifestAp
 
     db_update_project(
         project_id,
-        stage="building_storyboard",
+        stage="manifest_approved",
         revision_notes=body.revision_notes,
     )
-    return {"message": "Shot manifests locked — storyboard generation starting"}
+    return {"message": "Shot manifests locked — generating shot frames"}
 
 
 @router.post("/{project_id}/revise-manifests")
