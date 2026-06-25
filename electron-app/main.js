@@ -330,15 +330,24 @@ function createTrayMenu(config) {
 
 // App lifecycle
 app.on('ready', async () => {
+  // When launched by the run.py helper, the backend (and frontend) are already
+  // running and managed externally. In that case we skip spawning our own
+  // backend and skip the setup wizard (config comes from the project .env).
+  const externalBackend = process.env.HTXPUNK_SKIP_BACKEND === '1';
+
   let config = loadConfig();
 
-  if (!config.setupComplete) {
+  if (!externalBackend && !config.setupComplete) {
     config = await showSetupWizard();
   }
 
   try {
-    // Start backend
-    await startBackend(config);
+    // Start backend (unless an external launcher already started it)
+    if (externalBackend) {
+      await waitForBackend(config.backendPort);
+    } else {
+      await startBackend(config);
+    }
 
     // Create main window
     createWindow(config);
