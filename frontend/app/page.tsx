@@ -66,6 +66,13 @@ export default function Home() {
             <RefreshCw size={20} className={refreshing ? "animate-spin" : ""} />
           </button>
           <Link
+            href="/settings"
+            className="px-3 py-2 rounded-lg border border-gray-700 text-gray-300 hover:text-white hover:border-gray-500 transition text-sm"
+            title="API Settings"
+          >
+            ⚙️ Settings
+          </Link>
+          <Link
             href="/projects/new"
             className="bg-purple-600 hover:bg-purple-700 px-5 py-2 rounded-lg font-medium transition"
           >

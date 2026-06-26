@@ -12,11 +12,8 @@ groq==0.11.0
 # Audio transcription — faster-whisper: Python 3.13 compatible, faster than openai-whisper
 faster-whisper==1.1.1
 
-# Image generation — Hugging Face Inference Providers
-# >=0.28 required: earlier versions hardcode the retired
-# api-inference.huggingface.co endpoint. 0.28+ routes through the Inference
-# Providers system (router.huggingface.co) and supports the `provider` arg.
-huggingface-hub>=0.28,<1.0
+# Image generation — Gemini 2.5 Flash Image (free tier, 500 images/day)
+requests>=2.31.0
 Pillow>=12.1.0
 
 # Background removal — for element cutouts
@@ -35,3 +32,9 @@ pydantic-settings==2.5.2
 httpx==0.27.2
 python-dotenv==1.0.1
 pydub==0.25.1
+
+# Production guide import (Excel parsing)
+openpyxl==3.1.5
+
+# Video assembly — bundled ffmpeg binary fallback when ffmpeg isn't on PATH
+imageio-ffmpeg==0.5.1

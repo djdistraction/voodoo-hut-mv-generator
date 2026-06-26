@@ -4,7 +4,7 @@
 This is a full-stack AI music video generator that transforms song uploads into complete animated music videos with:
 - Automatic transcription & mood analysis
 - AI-generated visual treatments (Groq/Llama 3.3)
-- Background & character element generation (HuggingFace FLUX)
+- Background & character element generation (Gemini 2.5 Flash Image)
 - Storyboard composition & video assembly (FFmpeg with Ken Burns)
 - Human approval gates at treatment & storyboard stages
 
@@ -43,7 +43,8 @@ This is a full-stack AI music video generator that transforms song uploads into 
   - `audio_analyzer.py` — Whisper transcription + Groq analysis
   - `treatment_generator.py` — Groq visual treatment from analysis
   - `element_extractor.py` — Groq visual registry
-  - `image_generator.py` — HuggingFace FLUX background/element gen
+  - `image_generator.py` — Gemini image generation + offline Pillow fallback
+  - `gemini_image_generator.py` — Gemini 2.5 Flash Image client (free tier)
   - `storyboard_builder.py` — Scene planning
   - `compositor.py` — Pillow compositing panels
   - `video_assembler.py` — FFmpeg video & audio sync
@@ -59,38 +60,59 @@ This is a full-stack AI music video generator that transforms song uploads into 
 | Database | SQLite + SQLAlchemy (async) | No server needed |
 | LLM | Groq (Llama 3.3 70B) free tier | OpenAI-compatible API |
 | Audio | Faster-Whisper (CPU int8 quantized) | ~140MB model |
-| Image Gen | HuggingFace FLUX.1-schnell free API | 2s rate limit |
+| Image Gen | Gemini 2.5 Flash Image free tier | 500 images/day, no credit card |
 | Background Removal | rembg + onnxruntime | Local, no API needed |
-| Video Composition | Remotion (React) | Node.js based video rendering |
-| Video Assembly | FFmpeg | Ken Burns motion, audio sync |
+| Video Assembly | FFmpeg (default) | Ken Burns motion, audio sync, per-shot timing |
+| Video Assembly (opt-in) | Remotion (React) | Node-based; set VIDEO_BACKEND=remotion |
 | Task Queue | In-memory orchestrator (no Celery/Redis) | Runs in main uvicorn process |
 
 ---
 
 ## Setup
 
-### 1. Get Free API Keys
-- **Groq**: https://console.groq.com (no credit card)
-- **HuggingFace**: https://huggingface.co → Settings → Access Tokens → New token (read)
+### Desktop App (Recommended)
+```bash
+cd electron-app
+npm install
+npm run start
+```
+This launches the **setup wizard** on first run:
+1. Enter Groq API key (required, 30 seconds to get from console.groq.com)
+2. Enter Gemini API key (required, 30 seconds to get from aistudio.google.com)
+   - Both validated with real API calls before accepting
+   - Visual feedback: ✓ (valid) or ✗ (invalid)
+3. Choose storage folder
+4. Backend + frontend start automatically
+5. App opens at http://127.0.0.1:8000
 
-### 2. Create `.env` from template
+**Updating API keys later:**
+- Click ⚙️ Settings in the app (or /settings in web)
+- Add/update keys with live validation
+- Restart the app to apply changes
+
+### Manual Setup (Web/CLI mode)
+
+**1. Get Free API Keys** (both required)
+- **Groq** (text/audio analysis): https://console.groq.com (no credit card, takes 30s)
+- **Gemini** (image generation): https://aistudio.google.com (500 free images/day, no credit card, takes 30s)
+
+**2. Create `.env`**
 ```bash
 cp .env.example .env
-# Edit .env and add GROQ_API_KEY and HF_TOKEN
+# Edit .env:
+GROQ_API_KEY=gsk_...
+GEMINI_API_KEY=AIzaSy_...
+IMAGE_BACKEND=gemini  # Production mode. Use "placeholder" for dev-only offline mode.
 ```
 
-### 3. Backend
+**3. Backend**
 ```bash
 cd backend
 pip install -r requirements.txt
-# Terminal 1: API server
 uvicorn main:app --reload --port 8000
-
-# Terminal 2: (optional diagnostics)
-python -c "from config import settings; settings.validate_settings()"
 ```
 
-### 4. Frontend
+**4. Frontend**
 ```bash
 cd frontend
 npm install
@@ -105,6 +127,46 @@ npm install
 npx remotion studio
 # Opens http://localhost:3030
 ```
+
+---
+
+## First-Run Onboarding
+
+When the Electron app starts for the first time, it shows a **3-step setup wizard**:
+
+### Step 1: API Keys Configuration
+- **Groq API Key** (required): Takes 30 seconds to get from console.groq.com
+  - Validator checks the key with a real API call
+  - Gives instant visual feedback: ✓ (green) or ✗ (red)
+- **Gemini API Key** (required): Takes 30 seconds to get from aistudio.google.com
+  - Validator checks the key with a real API call
+  - 500 free images/day, no credit card needed
+  - Gives instant visual feedback: ✓ (green) or ✗ (red)
+
+### Step 2: Storage Configuration
+- Choose where to store generated images and videos (recommended: 50GB+ free space)
+- Set backend port (default 8000, usually fine)
+
+### Step 3: Confirmation
+- Review settings and click Finish
+- Backend auto-starts, database initializes, frontend opens
+
+### Settings After Install
+
+Users can update/add API keys later without reinstalling:
+
+1. Open the app → click ⚙️ Settings (or navigate to `/settings`)
+2. Paste new API keys
+3. Click Validate to check they work
+4. Click Save Settings
+5. Restart the app for changes to take effect
+
+### Configuration Storage
+
+The Electron app stores configuration in **`~/.htxpunk-mv-generator/`**:
+- `config.json` — user settings (API keys, port, storage path)
+- `.env` — generated from config, auto-injected into backend
+- Logs, database, and generated videos stored in the user's chosen storage folder
 
 ---
 
@@ -161,10 +223,13 @@ print(result)
 ### Environment Variables
 
 **Required:**
-- `GROQ_API_KEY` — from https://console.groq.com
-- `HF_TOKEN` — from https://huggingface.co
+- `GROQ_API_KEY` — from https://console.groq.com (takes 30 seconds, no credit card)
+- `GEMINI_API_KEY` — from https://aistudio.google.com (takes 30 seconds, 500 free images/day)
 
-**Optional:**
+**Optional (development only):**
+- `IMAGE_BACKEND` — "gemini" (production, default) | "placeholder" (dev-only offline, no API)
+
+**Other Optional:**
 - `WHISPER_MODEL` — tiny | base (default) | small | medium
 - `VIDEO_BACKEND` — ffmpeg (default) | runway (experimental)
 - `DATABASE_URL` — sqlite+aiosqlite:/// (default) or postgresql+asyncpg://
@@ -172,13 +237,14 @@ print(result)
 
 ### Upgrade Paths (all via `.env` only, no code changes):
 
-| Now (Free) | Later (GPU/Cloud) |
+| Now (Free) | Later (Faster/Better) |
 |---|---|
 | Groq / Llama 3.3 | Ollama (local GPU) or OpenAI GPT-4o |
-| HuggingFace FLUX | Local FLUX (GPU) or Replicate |
-| Local storage | Cloudflare R2 |
+| Gemini 2.5 Flash Image (free tier) | OpenAI DALL-E 3, Replicate, local FLUX (GPU) |
+| Offline placeholder frames | Real images from Gemini or other providers |
+| Local storage | Cloudflare R2, S3 |
 | SQLite | Supabase / PostgreSQL |
-| Remotion | Local GPU render or commercial |
+| FFmpeg Ken Burns | Wan2.1 or Remotion (GPU render, faster) |
 
 ---
 
@@ -195,6 +261,9 @@ layout.tsx (metadata, Tailwind setup)
     ├── treatment/
     │   ├── page.tsx (route wrapper)
     │   └── TreatmentDetail.tsx (review & approve treatment)
+    ├── manifest/
+    │   ├── page.tsx (route wrapper)
+    │   └── ManifestDetail.tsx (shot manifest table, approval/rejection)
     ├── elements/
     │   ├── page.tsx (route wrapper)
     │   └── ElementsList.tsx (asset gallery with regenerate)
@@ -210,8 +279,8 @@ layout.tsx (metadata, Tailwind setup)
 - Axios-based with 2-minute timeout for uploads
 - Auto-logs network errors with backend URL hint
 - Methods grouped by resource:
-  - `api.projects.{list, get, uploadAudio}`
-  - `api.pipeline.{approveTreatment, reviseTreatment, approveStoryboard, regenerateImage}`
+  - `api.projects.{list, get, uploadAudio, addReferences}`
+  - `api.pipeline.{approveTreatment, reviseTreatment, getShotManifests, approveManifests, reviseManifests, importProductionGuide, approveStoryboard, regenerateImage}`
   - `api.assets.list`
   - `api.series.{list, get, create}`
 
@@ -249,7 +318,73 @@ layout.tsx (metadata, Tailwind setup)
 
 **series** (for recurring characters/style)
 - id, name, artist
-- style_prompt, characters (JSON), color_palette (JSON)
+- style_prompt, characters (JSON), color_palette (JSON), continuity_bible (JSON)
+
+**shot_manifests** (production guide structure)
+- id (UUID)
+- project_id (FK)
+- shot_number, start_time, end_time, audio_cue
+- location, characters (JSON), camera, action, mood
+- continuity_rules (JSON), negative_constraints (JSON)
+- status (draft | reviewing | approved | locked | rejected)
+- locked_prompts (JSON, frozen after approval), asset_refs (JSON)
+
+---
+
+## Shot Manifest System
+
+The shot manifest layer provides production-grade structure for video generation:
+
+### Using Production Guides
+
+Import a production guide Excel file (e.g., shot sheet with timecodes, characters, continuity rules):
+
+```bash
+# From the frontend: upload file via UI
+POST /api/pipeline/{project_id}/import-production-guide
+
+# The API parses the file and creates shot manifests
+# Project transitions to awaiting_manifest_approval for human review
+```
+
+### Seeding the WOW OH! Demo
+
+The canonical demo ships embedded — **no external file needed**:
+
+```bash
+cd backend
+python seed_wow_oh.py
+# Optional: import from an Excel shot sheet instead
+python seed_wow_oh.py /path/to/WOW_OH_Production_Shot_Sheet.xlsx
+```
+
+This creates:
+- A "WOW OH!" series with locked characters + continuity bible (`services/wow_oh_data.py`)
+- A demo project with 30 shot manifests parked at `awaiting_manifest_approval`
+
+Approve the plan in the UI (or via the API) and the pipeline renders a full
+video. With no `HF_TOKEN`, frames render as offline placeholders
+(`IMAGE_BACKEND=placeholder`) so you get a complete preview video at $0.
+
+### Manifest-driven generation
+
+Once manifests are approved (`manifest_approved` stage), `run_manifest_generation`
+turns **each shot into a full-frame image**: it builds the prompt from the shot
+(characters + action + location + camera + mood) plus the series continuity
+bible (palette, motion style), and a negative prompt from the shot's
+`negative_constraints` + the bible's `banned_mistakes`. Each frame becomes a
+storyboard panel carrying its shot duration, then the project pauses at
+`awaiting_storyboard_approval`. Approving assembles the video (ffmpeg) using the
+per-shot timecodes. See `services/shot_prompt.py`.
+
+### Workflow
+
+1. **Import / seed**: production guide (Excel) or embedded data → shot manifests (draft)
+2. **Review**: human reviews shot manifests for accuracy and continuity
+3. **Approve**: locks the plan → `manifest_approved` → per-shot frame generation
+4. **Reject**: request changes → regenerates treatment with feedback
+5. **Generate**: locked manifests drive image generation with frozen prompts + constraints
+6. **Render**: approve storyboard → ffmpeg assembles the timed Ken Burns video
 
 ---
 
@@ -271,19 +406,20 @@ layout.tsx (metadata, Tailwind setup)
 - Check CORS: frontend on `:3000` should be allowed by backend (it is by default)
 
 ### Image generation fails
-**Error:** `ValueError: HF_TOKEN not set` or `401 Unauthorized`
-- **Fix:** Ensure `HF_TOKEN` in `.env` matches your HuggingFace read token
-- Token must have "Read access to contents of all public gated repos and private repos you can access"
+**Error:** `RuntimeError: Missing required API keys` or backend won't start
+- **Fix:** Ensure both keys are set in `.env`:
+  - `GROQ_API_KEY=gsk_...` from https://console.groq.com
+  - `GEMINI_API_KEY=AIzaSy_...` from https://aistudio.google.com
+- **Dev mode only:** Set `IMAGE_BACKEND=placeholder` to run offline (no API keys needed, images are non-functional placeholders)
 
-**Error:** `NameResolutionError` / `getaddrinfo failed` for `api-inference.huggingface.co`
-- **Cause:** HuggingFace retired the old serverless endpoint. That hostname no
-  longer resolves anywhere — it is not a local network problem.
-- **Fix:** Upgrade the client so it uses the new Inference Providers router:
-  `pip install -U huggingface_hub` (needs >=0.28), then restart the backend.
-  Routing is controlled by `HF_PROVIDER` in `.env` (default `auto`).
-- **Note:** Inference Providers usage is billed against your HF account; free
-  accounts get a small monthly credit. Pin a provider via `HF_PROVIDER`
-  (e.g. `fal-ai`, `replicate`, `nebius`) if `auto` can't serve the model.
+**Error:** `401 Unauthorized` from Gemini
+- **Fix:** Check that `GEMINI_API_KEY` is correct at https://aistudio.google.com
+- Verify the key hasn't been revoked or disabled
+- Update via Settings (/settings) in the app
+
+**Error:** Rate limited (500 images/day quota exceeded)
+- **Immediate:** Generation fails with clear error (system does not degrade gracefully)
+- **Fix:** Wait until quota resets (midnight UTC) or upgrade to paid Gemini tier or Replicate
 
 ### Video assembly hangs
 **Error:** Progress stuck at "Assembling…" for >30 min
@@ -304,9 +440,9 @@ layout.tsx (metadata, Tailwind setup)
 - Default is `base` (15-25s on CPU, good accuracy)
 
 ### Image Generation
-- HuggingFace free API has 2s rate limit between calls
-- Total time: ~5-10 min for 4 backgrounds + 8-12 character states
-- GPU upgrade would reduce to <1 min
+- Gemini free tier: ~3-5 min for typical shot (includes API latency + retry waits)
+- Quota: 500 images/day, resets daily
+- Upgrade to paid Gemini or Replicate for faster/unlimited: <1 min with GPU
 
 ### Video Assembly
 - FFmpeg Ken Burns: 15-25 min for typical 4-min song (CPU bound)
@@ -322,7 +458,8 @@ layout.tsx (metadata, Tailwind setup)
 
 - [ ] Backend running: `curl http://localhost:8000/health`
 - [ ] Frontend running: `http://localhost:3000` loads
-- [ ] `.env` has `GROQ_API_KEY` and `HF_TOKEN`
+- [ ] `.env` has `GROQ_API_KEY` (required)
+- [ ] `.env` has `GEMINI_API_KEY` (required)
 - [ ] Storage directory created: `ls backend/storage/`
 - [ ] Database created: `ls backend/htxpunk.db`
 - [ ] Orchestrator started: check backend logs for "Chimera Tower online"
