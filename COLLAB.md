@@ -3,6 +3,30 @@
 This repo is worked on by **two Claude instances** that talk to each other through
 **comments on the active GitHub PR** (currently **PR #6**).
 
+## START HERE (Local Claude, cold start)
+
+Do these in order before anything else:
+
+1. **Sync the code:**
+   ```powershell
+   cd "C:\Users\booki\HTXpunk LLC\htxpunk-mv-generator"
+   git fetch origin
+   git checkout claude/youthful-cray-l9yx4c
+   git reset --hard origin/claude/youthful-cray-l9yx4c
+   ```
+2. **Read the project context:** `CLAUDE.md` (full architecture, pipeline, setup) and
+   the "Current state / what's next" section below.
+3. **Confirm GitHub CLI is ready:** `gh auth status` (you need it to read/post PR
+   comments). If not logged in: `gh auth login`.
+4. **Read the conversation so far:**
+   ```powershell
+   gh pr view 6 -R djdistraction/htxpunk-mv-generator --comments
+   ```
+5. **Do the latest open task** addressed to you and report back (see protocol below).
+
+You are **Local Claude**. Your job is to run/test/build on this Windows PC and report
+results. Cloud Claude writes the code and pushes; you are its hands on the real machine.
+
 ## The two roles
 
 | | Cloud Claude (Claude Code) | Local Claude (Claude Desktop + Desktop Commander) |
@@ -28,6 +52,22 @@ Comment prefixes (keep them, they make intent unambiguous):
   output/errors verbatim — that's what lets Cloud fix it without guessing).
 - `DONE:` — Cloud → Local. Pushed; pull the branch and test. Says what to run.
 - `NEED:` — Cloud → Local. A question or decision required before continuing.
+
+### Reading and posting comments (gh CLI)
+
+```powershell
+# read the whole thread (newest at the bottom)
+gh pr view 6 -R djdistraction/htxpunk-mv-generator --comments
+
+# post back — use a heredoc for multi-line / pasted output
+gh pr comment 6 -R djdistraction/htxpunk-mv-generator --body @"
+RESULT: ran make_wow_oh_images.py
+<paste exact output or error here>
+"@
+```
+
+Always end a working session by posting a comment — that is the doorbell that wakes
+Cloud Claude. No comment = Cloud Claude never sees your push.
 
 ## Standard loop
 
