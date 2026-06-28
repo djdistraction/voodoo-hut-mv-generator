@@ -70,6 +70,26 @@ uvicorn main:app --port 8000          # window A
 - ⬜ Storyboard → animated video clips (needs a **paid** image-to-video model — decision pending)
 - ⬜ One-double-click Windows installer (bundle Python backend + Electron; **Local Claude's job to build/test**)
 
+## Surfaces & routing
+
+The owner orchestrates several Claude surfaces, all coordinated through PR #6:
+
+| Surface | Lane |
+|---|---|
+| Owner's **phone** (GitHub mobile app) | Posts requests as PR #6 comments from anywhere |
+| **Cloud Claude** (this, Claude Code) | Code + GitHub; always-on hub, woken by PR comments |
+| **Local Claude** (Claude Desktop + Desktop Commander) | Runs/tests/installs on the Windows PC |
+| **Claude for Chrome** | Browser tasks: Cloudflare dashboard, previewing output |
+
+Routing: a request lands as a PR #6 comment. **Cloud Claude triages it** — does the
+code/GitHub parts itself; for anything needing the PC or browser, it posts a `NEED:`
+comment naming the surface (e.g. `NEED: @local run the installer build` or
+`NEED: @chrome open the Cloudflare AI dashboard and confirm the Workers AI quota`).
+The Claudes do not talk to each other automatically — PR #6 is the manual relay.
+
+To reach Cloud Claude from a phone: comment on **PR #6** via the GitHub app. (Opening
+the Claude app starts a different session, not this one.)
+
 ## Secrets hygiene
 
 Never put API keys/tokens in commits, code, or PR comments. Keys live only in the
