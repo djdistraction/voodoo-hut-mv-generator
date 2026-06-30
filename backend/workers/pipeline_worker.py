@@ -422,9 +422,21 @@ def regenerate_single_image(project_id: str, asset_id: str, new_prompt: str):
         # Full-frame shot: same generator the manifest path uses, so a re-roll
         # matches the rest of the storyboard (16:9, no background removal).
         from services.image_generator import generate_shot_frame
+        import re
+
+        # Preserve any locked negative prompt so a re-roll matches the original constraints.
+        manifest_id = asset.get("shot_manifest_id")
+        if manifest_id:
+            from database import db_get_shot_manifest
+            manifest = db_get_shot_manifest(manifest_id) or {}
+            negative = (manifest.get("locked_prompts") or {}).get("negative_prompt") or ""
+            if negative:
+                style_suffix = (style_suffix + " " if style_suffix else "") + f"Avoid: {negative}"
+
         shot_no = asset.get("shot_number") or asset.get("label") or asset_id[:6]
+        shot_id = "shot_" + re.sub(r"[^A-Za-z0-9_-]+", "_", str(shot_no)).strip("_")
         new_url = generate_shot_frame(
-            project_id, f"shot_{shot_no}", new_prompt,
+            project_id, shot_id, new_prompt,
             style_suffix=style_suffix,
             label=asset.get("label") or f"Shot {shot_no}",
             subtitle=asset.get("lyric") or "",
