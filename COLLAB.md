@@ -9,7 +9,7 @@ Do these in order before anything else:
 
 1. **Sync the code:**
    ```powershell
-   cd "C:\Users\booki\HTXpunk LLC\htxpunk-mv-generator"
+   cd "<path-to-your-local-clone-of-this-repo>"
    git fetch origin
    git checkout claude/youthful-cray-l9yx4c
    git reset --hard origin/claude/youthful-cray-l9yx4c
