@@ -81,7 +81,7 @@ Cloud Claude. No comment = Cloud Claude never sees your push.
 ## Running on the PC (Local Claude quick start)
 
 ```powershell
-cd "C:\Users\booki\HTXpunk LLC\htxpunk-mv-generator"
+cd "<path-to-your-local-clone-of-this-repo>"
 git fetch origin
 git checkout claude/youthful-cray-l9yx4c
 git reset --hard origin/claude/youthful-cray-l9yx4c   # match the cloud branch exactly
