@@ -36,8 +36,15 @@ class Settings(BaseSettings):
     database_url: str = f"sqlite+aiosqlite:///{Path(__file__).parent / 'htxpunk.db'}"
 
     # Video generation backend: "ffmpeg" | "runway" | "wan2"
-    video_backend: str = "ffmpeg"
+    video_backend: str = "ffmpeg"   # ffmpeg (Ken Burns stills) | modal (AI video + lip-sync)
     runway_api_key: str = ""
+
+    # Modal — serverless GPU for AI image-to-video + lip-sync (self-hosted models)
+    # Tokens come from `modal token new` on the machine that deploys the app; Modal
+    # also reads MODAL_TOKEN_ID / MODAL_TOKEN_SECRET straight from the environment.
+    lipsync_enabled: bool = True
+    modal_token_id: str = ""
+    modal_token_secret: str = ""
 
     # FFmpeg ken burns settings
     video_fps: int = 25
